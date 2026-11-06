@@ -9,9 +9,12 @@ SECRET = os.environ.get("WEBHOOK_SECRET", "")
 
 HELP = (
     "Использование:\n"
-    "/roll — от 1 до 100\n"
-    "/roll 50 — от 1 до 50\n"
-    "/roll 10 20 — от 10 до 20"
+    "/roll — число от 1 до 100\n"
+    "/roll 50 — число от 1 до 50\n"
+    "/roll 10 20 — число от 10 до 20\n"
+    "/roll пицца суши роллы — случайное слово из списка\n"
+    "/roll идти в кино, сидеть дома — варианты через запятую\n"
+    "/howgay — случайный процент"
 )
 
 
@@ -24,30 +27,48 @@ def send_message(chat_id, text):
     urllib.request.urlopen(req, timeout=8)
 
 
+def is_int(s):
+    try:
+        int(s)
+        return True
+    except ValueError:
+        return False
+
+
 def build_reply(text):
-    parts = text.split()
+    parts = text.split(maxsplit=1)
     if not parts:
         return None
     command = parts[0].split("@")[0].lower()
+    if command == "/howgay":
+        return f"🏳️‍🌈 I’m {random.randint(0, 100)}% gay"
     if command != "/roll":
         return None
 
-    args = parts[1:]
-    try:
+    rest = parts[1].strip() if len(parts) > 1 else ""
+    args = rest.split()
+
+    # Режим чисел: пусто, одно или два целых числа без запятых
+    if "," not in rest and len(args) <= 2 and all(is_int(a) for a in args):
         if len(args) == 0:
             low, high = 1, 100
         elif len(args) == 1:
             low, high = 1, int(args[0])
-        elif len(args) == 2:
-            low, high = int(args[0]), int(args[1])
         else:
-            return HELP
-    except ValueError:
-        return HELP
+            low, high = int(args[0]), int(args[1])
+        if low > high:
+            low, high = high, low
+        return f"🎲 {random.randint(low, high)} (от {low} до {high})"
 
-    if low > high:
-        low, high = high, low
-    return f"🎲 {random.randint(low, high)} (от {low} до {high})"
+    # Режим слов: через запятую или через пробел
+    if "," in rest:
+        options = [o.strip() for o in rest.split(",") if o.strip()]
+    else:
+        options = args
+
+    if len(options) < 2:
+        return HELP
+    return f"🎯 {random.choice(options)}"
 
 
 class handler(BaseHTTPRequestHandler):
@@ -82,3 +103,4 @@ class handler(BaseHTTPRequestHandler):
 
         # Всегда отвечаем 200, иначе Telegram будет слать сообщение повторно
         self._ok()
+
