@@ -7,6 +7,11 @@ from http.server import BaseHTTPRequestHandler
 TOKEN = os.environ.get("BOT_TOKEN", "")
 SECRET = os.environ.get("WEBHOOK_SECRET", "")
 
+# Особые ответы для /howgay: ник (маленькими буквами, без @) -> процент
+HOWGAY_FIXED = {
+    "herodont": 100,
+}
+
 HELP = (
     "Использование:\n"
     "/roll — число от 1 до 100\n"
@@ -35,13 +40,17 @@ def is_int(s):
         return False
 
 
-def build_reply(text):
+def build_reply(text, username=None):
     parts = text.split(maxsplit=1)
     if not parts:
         return None
     command = parts[0].split("@")[0].lower()
     if command == "/howgay":
-        return f"🏳️‍🌈 I’m {random.randint(0, 100)}% gay"
+        if (username or "").lower() in HOWGAY_FIXED:
+            percent = HOWGAY_FIXED[(username or "").lower()]
+        else:
+            percent = random.randint(0, 100)
+        return f"🏳️‍🌈 you’re {percent}% gay"
     if command != "/roll":
         return None
 
@@ -95,7 +104,8 @@ class handler(BaseHTTPRequestHandler):
             text = message.get("text", "")
             chat_id = (message.get("chat") or {}).get("id")
 
-            reply = build_reply(text) if chat_id else None
+            username = (message.get("from") or {}).get("username")
+            reply = build_reply(text, username) if chat_id else None
             if reply:
                 send_message(chat_id, reply)
         except Exception as e:
@@ -103,4 +113,3 @@ class handler(BaseHTTPRequestHandler):
 
         # Всегда отвечаем 200, иначе Telegram будет слать сообщение повторно
         self._ok()
-
